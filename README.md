@@ -2,7 +2,7 @@
 
 This service reads from a local .dcm, process the dicom file, stores the various images/tags to persistence memory and then presents them
 
-![alt text](https://drive.google.com/file/d/1F4hcaqVSz9GkIN2OPSKux9xto67px0Yh/view?usp=sharing)
+![alt text](https://github.com/j27cai/dicom/blob/main/architecture.png?raw=true)
 
 # REST API
 
