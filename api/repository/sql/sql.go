@@ -1,10 +1,11 @@
 package sql
 
 import (
-	"dicom/api/common"
-	"dicom/api/model"
+    "dicom/api/common"
+    "dicom/api/model"
 
     "database/sql"
+    "log"
     _ "github.com/mattn/go-sqlite3"
 )
 
@@ -15,26 +16,28 @@ type Repository interface {
     InsertTag(tag model.Tag) (int64, error)
     InsertDicomTag(dicomID, tagID int64) (int64, error)
     GetDicomByUUID(uuid string) (*model.Dicom, error)
+    GetTagsByDicomUUID(uuid string) ([]model.Tag, error)
 }
 
 type Database struct {
-    db *sql.DB
+    db     *sql.DB
+    logger *log.Logger
 }
 
-// Setup initializes the SQLite3 database and creates necessary tables
-func Setup() (*Database, error) {
+func NewSqlDatabase(logger *log.Logger) (*Database, error) {
     db, err := sql.Open("sqlite3", "./dicom.db")
     if err != nil {
+        logger.Printf("Error opening database: %v", err)
         return nil, err
     }
 
-    // Create the tables if they don't exist
     _, err = db.Exec(`CREATE TABLE IF NOT EXISTS dicom (
         id INTEGER PRIMARY KEY,
-        uuid string TEXT UNIQUE
+        uuid string TEXT UNIQUE,
         image_url TEXT UNIQUE
     )`)
     if err != nil {
+        logger.Printf("Error creating dicom table: %v", err)
         return nil, err
     }
 
@@ -43,24 +46,27 @@ func Setup() (*Database, error) {
         tagId INTEGER
     )`)
     if err != nil {
+        logger.Printf("Error creating dicomTags table: %v", err)
         return nil, err
     }
 
     _, err = db.Exec(`CREATE TABLE IF NOT EXISTS tags (
         id INTEGER PRIMARY KEY,
-        uuid TEXT UNIQUE
+        uuid TEXT UNIQUE,
         Tag TEXT,
         VR TEXT,
-        V INTEGER,
-        Value TEXT
+        Value TEXT,
+        Name TEXT
     )`)
 
     if err != nil {
+        logger.Printf("Error creating tags table: %v", err)
         return nil, err
     }
 
-    return &Database{db: db}, nil
+    return &Database{db: db, logger: logger}, nil
 }
+
 
 func (d *Database) Close() error {
     return d.db.Close()
@@ -69,6 +75,7 @@ func (d *Database) Close() error {
 func (d *Database) InsertDicom(imageURL string, uuid string) (int64, error) {
     result, err := d.db.Exec("INSERT INTO dicom (image_url, uuid) VALUES (?, ?)", imageURL, uuid)
     if err != nil {
+        d.logger.Printf("Error inserting DICOM: %v", err)
         return 0, err
     }
 
@@ -76,10 +83,11 @@ func (d *Database) InsertDicom(imageURL string, uuid string) (int64, error) {
 }
 
 func (d *Database) InsertTag(tag model.Tag) (int64, error) {
-	uuid := common.GenShortUUID()
+    uuid := common.GenShortUUID()
 
-    result, err := d.db.Exec("INSERT INTO tags (uuid, Tag, VR, V, Value) VALUES (?, ?, ?, ?, ?)", uuid, tag.Tag, tag.VR, tag.Value, tag.Name)
+    result, err := d.db.Exec("INSERT INTO tags (uuid, Tag, VR, Value, Name) VALUES (?, ?, ?, ?, ?)", uuid, tag.Tag, tag.VR, tag.Value, tag.Name)
     if err != nil {
+        d.logger.Printf("Error inserting tag: %v", err)
         return 0, err
     }
 
@@ -89,6 +97,7 @@ func (d *Database) InsertTag(tag model.Tag) (int64, error) {
 func (d *Database) InsertDicomTag(dicomID, tagID int64) (int64, error) {
     result, err := d.db.Exec("INSERT INTO dicomTags (dicomId, tagId) VALUES (?, ?)", dicomID, tagID)
     if err != nil {
+        d.logger.Printf("Error inserting DICOM tag: %v", err)
         return 0, err
     }
 
@@ -100,7 +109,45 @@ func (d *Database) GetDicomByUUID(uuid string) (*model.Dicom, error) {
     row := d.db.QueryRow("SELECT id, image_url FROM dicom WHERE uuid = ?", uuid)
     err := row.Scan(&dicom.ID, &dicom.ImageURL)
     if err != nil {
+        d.logger.Printf("Error getting DICOM by UUID: %v", err)
         return nil, err
     }
     return &dicom, nil
 }
+
+func (d *Database) GetTagsByDicomUUID(uuid string) ([]model.Tag, error) {
+    var tags []model.Tag
+
+    // Select all tags associated with the DICOM UUID
+    query := `
+        SELECT tags.id, tags.Tag, tags.VR, tags.Value, tags.Name
+        FROM dicomTags
+        JOIN tags ON dicomTags.tagId = tags.id
+        JOIN dicom ON dicomTags.dicomId = dicom.id
+        WHERE dicom.uuid = ?
+    `
+
+    rows, err := d.db.Query(query, uuid)
+    if err != nil {
+        d.logger.Printf("Error getting tags by DICOM UUID: %v", err)
+        return nil, err
+    }
+    defer rows.Close()
+
+    // Iterate through the rows and populate the tags slice
+    for rows.Next() {
+        var tag model.Tag
+        if err := rows.Scan(&tag.ID, &tag.Tag, &tag.VR, &tag.Value, &tag.Name); err != nil {
+            d.logger.Printf("Error scanning tag row: %v", err)
+            return nil, err
+        }
+        tags = append(tags, tag)
+    }
+    if err := rows.Err(); err != nil {
+        d.logger.Printf("Error iterating over tag rows: %v", err)
+        return nil, err
+    }
+
+    return tags, nil
+}
+

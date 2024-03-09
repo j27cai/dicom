@@ -10,9 +10,9 @@ package model
 
 // Tag represents a DICOM tag
 type Tag struct {
-    ID    int64
+	ID    int64
     Tag   string
     VR    string
-    Value int
+    Value string
     Name  string
 }

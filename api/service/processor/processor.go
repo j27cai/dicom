@@ -1,59 +1,91 @@
 package processor
 
 import (
-    "dicom/api/repository/block"
+    "log"
+
+    "dicom/api/model"
+    "dicom/api/repository/blob"
     "dicom/api/repository/sql"
 
     "github.com/suyashkumar/dicom"
     "github.com/suyashkumar/dicom/pkg/tag"
 )
 
-type DicomProcessor interface {
-    ExtractDicomHeaders(dicomDataset *dicom.Dataset) error
+type Processor interface {
+    ExtractDicomHeaders(id string, dicomDataset *dicom.Dataset) error
     ExtractDicomImage(id string, dicomDataset *dicom.Dataset) error
 }
 
-type DicomExtractor struct {
+type DicomProcessor struct {
     sql     sql.Repository
-    block   block.Repository
+    blob   blob.Repository
+    logger  *log.Logger
 }
 
-func NewDicomExtractor(sqlRepo sql.Repository, blockRepo block.Repository) *DicomExtractor {
-    d := &DicomExtractor{
-        sql:   sqlRepo,
-        block: blockRepo,
+func NewDicomProcessor(sqlRepo sql.Repository, blobRepo blob.Repository, logger *log.Logger) *DicomProcessor {
+    p := &DicomProcessor{
+        sql:    sqlRepo,
+        blob:  blobRepo,
+        logger: logger,
     }
 
-    return d
+    return p
 }
 
+// Get all the headers and read them and store them in SQL
+func (p *DicomProcessor) ExtractDicomHeaders(id string, dicomDataset *dicom.Dataset) error {
+    dicom, err := p.sql.GetDicomByUUID(id)
+    if err != nil {
+        p.logger.Printf("Error retrieving DICOM by UUID: %v", err)
+        return err
+    }
 
-// Get basically all the headers and read them and store them in sql
-func (d DicomProcessor) ExtractDicomHeaders(dicomDataset *dicom.Dataset) error {
-    // pixelDataElement, _ := dicomDataset.FindElementByTag(tag.PixelData)
-    // pixelDataInfo := dicom.MustGetPixelDataInfo(pixelDataElement.Value)
-    // for i, fr := range pixelDataInfo.Frames {
-    //     img, _ := fr.GetImage() // The Go image.Image for this frame
-    //     f, _ := os.Create(fmt.Sprintf("image_%d.png", i))
-    //     _ = png.Encode(f, img)
-    //     _ = f.Close()
-    // }
+    for elem := dicomDataset.FlatStatefulIterator(); elem.HasNext(); {
+        e := elem.Next()
+        var tagName string
+        if tagInfo, err := tag.Find(e.Tag); err == nil {
+            tagName = tagInfo.Name
+        }
+        
+        tag := model.Tag{
+            Tag:          e.Tag.String(),
+            Name:         tagName,
+            VR:           e.ValueRepresentation.String(),
+            Value:        e.Value.String(),
+        }
+
+        tagID, err := p.sql.InsertTag(tag)
+        if err != nil {
+            p.logger.Printf("Error inserting tag: %v", err)
+            return err
+        }
+
+        _, err = p.sql.InsertDicomTag(dicom.ID, tagID)
+        if err != nil {
+            p.logger.Printf("Error inserting tag: %v", err)
+            return err
+        }
+    }
 
     return nil
 }
 
-// Store image in "block" storage and then store then generated the image url and store the image url in database
-func (d DicomProcessor) ExtractDicomImage(id string, dicomDataset *dicom.Dataset) error {
-	pixelDataElement, _ := dicomDataset.FindElementByTag(tag.PixelData)
-	pixelDataInfo := dicom.MustGetPixelDataInfo(pixelDataElement.Value)
-	for i, fr := range pixelDataInfo.Frames {
-		img, _ := fr.GetImage()
-        dicom, err := sql.GetDicomByUUID(id)
+// Store image in "blob" storage and then store then generated the image URL and store the image URL in the database
+func (p *DicomProcessor) ExtractDicomImage(id string, dicomDataset *dicom.Dataset) error {
+    pixelDataElement, _ := dicomDataset.FindElementByTag(tag.PixelData)
+    pixelDataInfo := dicom.MustGetPixelDataInfo(pixelDataElement.Value)
+    for _, fr := range pixelDataInfo.Frames {
+        img, _ := fr.GetImage()
+        dicom, err := p.sql.GetDicomByUUID(id)
         if err != nil {
+            p.logger.Printf("Error retrieving DICOM by UUID: %v", err)
             return err
         }
-		block.WritePngToFile(img, dicom.ImageURL)
-	}
+        if err := p.blob.WritePngToFile(img, dicom.ImageURL); err != nil {
+            p.logger.Printf("Error writing PNG to file: %v", err)
+            return err
+        }
+    }
 
-	return nil
+    return nil
 }

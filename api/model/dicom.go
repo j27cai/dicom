@@ -1,6 +1,6 @@
 package model
 
 type Dicom struct {
-	ID       string
+	ID       int64
 	ImageURL string
 }

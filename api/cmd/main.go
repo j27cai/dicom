@@ -1,11 +1,15 @@
 package main
 
 import (
+	"fmt"
+	"log"
 	"net/http"
+	"os"
+	
 	"github.com/gorilla/mux"
 
 	"dicom/api/client"
-	"dicom/api/repository/block"
+	"dicom/api/repository/blob"
 	"dicom/api/repository/sql"
 	"dicom/api/service/fetcher"
 	"dicom/api/service/parser"
@@ -13,30 +17,31 @@ import (
 )
 
 func main() {
-	// Instantiate block storage repository
-	blockStorage, err := block.Setup()
+	logger := log.New(os.Stdout, "dicom-service: ", log.LstdFlags)
+	
+	blobStorage, err := blob.NewBlobStorage(logger)
 	if err != nil {
 		panic(err)
 	}
 
-	// Instantiate SQL repository
-	sqlRepo, err := repository.Setup()
+	
+	sqlRepo, err := sql.NewSqlDatabase(logger)
 	if err != nil {
 		panic(err)
 	}
 
 	// Instantiate fetcher service
-	dicomFetcher := fetcher.NewDicomProvider(blockStorage, sqlRepo)
+	dicomFetcher := fetcher.NewDicomFetcher(blobStorage, sqlRepo, logger)
 
 	// Instantiate parser service
-	dicomParser := parser.NewDicomConverter(sqlRepo)
+	dicomParser := parser.NewDicomParser(sqlRepo, logger)
 
 	// Instantiate processor service
-	dicomProcessor := processor.NewDicomExtractor(sqlRepo, blockStorage)
+	dicomProcessor := processor.NewDicomProcessor(sqlRepo, blobStorage, logger)
 
 	// Set up HTTP server
 	router := mux.NewRouter()
-	client.Setup(router, dicomParser, dicomProcessor)
+	client.Setup(router, dicomParser, dicomProcessor, dicomFetcher, logger)
 
 	// Define server settings
 	serverAddr := ":8080"
@@ -44,6 +49,8 @@ func main() {
 		Addr:    serverAddr,
 		Handler: router,
 	}
+
+	fmt.Println("server started")
 
 	// Start server
 	if err := server.ListenAndServe(); err != nil {

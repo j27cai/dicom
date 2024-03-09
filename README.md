@@ -6,7 +6,7 @@ sqlite (dicom - id, image_url
 	    dicom-tags - dicom id, tag id
 	    tag - id, Tag, VR, Name)
 
-backup/block storage for now:
+backup/blob storage for now:
 
 local s3
 
