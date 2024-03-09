@@ -48,8 +48,8 @@ func TestInsertDicomAndGetByUUID(t *testing.T) {
 }
 
 func TestInsertAndRetrieveTags(t *testing.T) {
-	imageURL := "test2_image_url_" + uuid.New().String() // Generate a random image URL
-	dicomUUID := uuid.New().String()                     // Generate a random DICOM UUID
+	imageURL := "test2_image_url_" + uuid.New().String() 
+	dicomUUID := uuid.New().String()                     
 
 	dicomId, err := testDB.InsertDicom(imageURL, dicomUUID)
 	if err != nil {
@@ -73,7 +73,6 @@ func TestInsertAndRetrieveTags(t *testing.T) {
 		t.Errorf("InsertDicomTag failed: %v", err)
 	}
 
-	// Test GetTagsByDicomUUID method
 	tags, err := testDB.GetTagsByDicomUUID(dicomUUID)
 	if err != nil {
 		t.Errorf("GetTagsByDicomUUID failed: %v", err)

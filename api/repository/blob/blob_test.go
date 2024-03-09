@@ -61,7 +61,6 @@ func TestWritePngToFile(t *testing.T) {
 }
 
 func TestReadImageFromFile(t *testing.T) {
-	// Encode test image to PNG and write it to a file
 	file, _ := os.Create(testImagePath)
 	defer file.Close()
 	err := png.Encode(file, testImage)
@@ -69,18 +68,15 @@ func TestReadImageFromFile(t *testing.T) {
 		t.Fatalf("Failed to encode test image: %v", err)
 	}
 
-	// Read the image file using BlobStorage
 	imageFromStorage, err := blockStorage.ReadImageFromFile(testImagePath)
 	if err != nil {
 		t.Errorf("ReadImageFromFile returned an unexpected error: %v", err)
 	}
 
-	// Check if the dimensions of the retrieved image match the original image
 	if imageFromStorage.Bounds().Size() != testImage.Bounds().Size() {
 		t.Errorf("Dimensions of the retrieved image do not match the original image")
 	}
 
-	// Remove the temporary file
 	err = os.Remove(testImagePath)
 	if err != nil {
 		t.Errorf("Failed to remove temporary file: %v", err)

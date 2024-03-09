@@ -44,7 +44,7 @@ func main() {
 	client.Setup(router, dicomParser, dicomProcessor, dicomFetcher, logger)
 
 	// Define server settings
-	serverAddr := ":8080"
+	serverAddr := ":8000"
 	server := &http.Server{
 		Addr:    serverAddr,
 		Handler: router,
