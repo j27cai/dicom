@@ -2,6 +2,8 @@
 
 This service reads from a local .dcm, process the dicom file, stores the various images/tags to persistence memory and then presents them
 
+![alt text](https://drive.google.com/file/d/1F4hcaqVSz9GkIN2OPSKux9xto67px0Yh/view?usp=sharing)
+
 # REST API
 
 The REST API to the dicom parser is described below.
@@ -76,6 +78,11 @@ Gets a image through a query parameter for a uniquely indentifiable dicom file p
 	    ]
 	}
 
+
+
+
+Scratch notes
+
 database for now:
 
 sqlite (dicom - id, image_url
@@ -84,13 +91,11 @@ sqlite (dicom - id, image_url
 
 backup/blob storage for now:
 
-local s3
+local disk
 
 backend:
 
 golang
-
-
 
 Later:
 
