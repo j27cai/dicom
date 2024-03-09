@@ -4,6 +4,14 @@ This service reads from a local .dcm, process the dicom file, stores the various
 
 ![alt text](https://github.com/j27cai/dicom/blob/main/architecture.png?raw=true)
 
+## running the service
+
+`docker-compose up`
+
+on root level
+
+runs on port 8001 by default per definition in docker-compose.yml
+
 # REST API
 
 The REST API to the dicom parser is described below.
