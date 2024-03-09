@@ -4,7 +4,7 @@ This service reads from a local .dcm, process the dicom file, stores the various
 
 ![alt text](https://github.com/j27cai/dicom/blob/main/architecture.png?raw=true)
 
-## running the service
+## Running the service
 
 `docker-compose up`
 
